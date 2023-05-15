@@ -3,7 +3,7 @@ function [d, p, Xfdh, Yfdh] = NCA(X,Y)
 % sufficient) conditions in data sets with discrete (with many values) 
 % and continuous necessary conditions.
 % The ceiling line is estimated using ceiling regression with Free Disposal
-% Hull (FDH) to obtain the "empty space" of the left upper corner
+% Hull (FDH) to obtain the "empty space" of the left upper corner.
 % If a negative slope is found for Y is found then the "empty space" of left 
 % lower corner is estimated by mirroring Y.
 %
