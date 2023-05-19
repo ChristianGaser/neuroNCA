@@ -1,4 +1,4 @@
-function [d, p] = NCA(X,Y)
+function [d, p, Xfdh, Yfdh] = NCA(X,Y)
 % Necessary Condition Analysis (NCA) for identifying necessary (but not
 % sufficient) conditions in data sets with discrete (with many values) 
 % and continuous necessary conditions.
@@ -24,6 +24,8 @@ function [d, p] = NCA(X,Y)
 % d    - effect size of the necessary condition with size m x 1
 % p    - coefficient s of the linear fit: offset and slope of the ceiling line
 %        that defines the "empty space" with size m x 2
+% Xfdh - estimated X-values of the Free Disposal Hull (FDH)
+% Yfdh - estimated Y-values of the Free Disposal Hull (FDH)
 % ______________________________________________________________________
 %
 % Christian Gaser
@@ -150,6 +152,11 @@ if any(flipx)
   d(flipx) = d0;
   p(flipx,:) = p0;
 end
+
+% remove NAN entries for output
+ind = isfinite(Xfdh);
+Xfdh = Xfdh(ind);
+Yfdh = Yfdh(:,ind);
 
 % ______________________________________________________________________
 function [d, beta] = NCA_effect_size(Xfdh,Yfdh,X,Y)

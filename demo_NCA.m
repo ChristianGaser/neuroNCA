@@ -28,7 +28,7 @@ hold on
 Xfit = linspace(Xmin,Xmax,100);
 Yfit = p(1) + p(2)*Xfit;
 
-Acc = 100 - sum(y > (p(1) + p(2)*x))/numel(x);
+Acc = 100*(1 - sum(y > (p(1) + p(2)*x))/numel(x));
 
 str = 'Example 1 with large effect size';
 fprintf('%s\n',str);
@@ -53,7 +53,7 @@ hold on
 Xfit = linspace(Xmin,Xmax,100);
 Yfit = p(1) + p(2)*Xfit;
 
-Acc = 100 - sum(y > (p(1) + p(2)*x))/numel(x);
+Acc = 100*(1 - sum(y > (p(1) + p(2)*x))/numel(x));
 
 str = 'Example 2 with small effect size';
 fprintf('%s\n',str);
