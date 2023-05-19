@@ -1,4 +1,12 @@
 function demo_NCA
+% demo tool for univariate NCA
+% ______________________________________________________________________
+%
+% Christian Gaser
+% Structural Brain Mapping Group (https://neuro-jena.github.io)
+% Departments of Neurology and Psychiatry
+% Jena University Hospital
+% ______________________________________________________________________
 
 rng(2)
 

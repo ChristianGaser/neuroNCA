@@ -1,5 +1,14 @@
 function NCA_estimate_stat(job)
-% main NCA function for estimating NCA statistics
+% Main NCA function for estimating NCA statistics
+%
+% Existing SPM designs (saved as SPM.mat) are used to recognise the model. 
+% and restrict the NCA to regression designs. Additional nuisance parameters are
+% ignored, as the necessity of a factor does not depend on other factors, 
+% and the model specification can be restricted to the potentially necessary 
+% conditions of interest. Therefore, we do not need to control for other 
+% variables because the estimated effect size of the necessity variable
+% is not contaminated by the presence or absence of other (necessary) 
+% variables. 
 %
 % FORMAT NCA_estimate_stat(job)
 % job        - job from tbx_cfg_NCA
@@ -11,22 +20,12 @@ function NCA_estimate_stat(job)
 %     0 - no multi-threading
 %     x - number of processors for multi-threading
 %
-%   nuisance_method 
-%     method to deal with nuisance variables
-%     0 - Draper-Stoneman
-%     1 - Freedman-Lane
-%     2 - Smith
-% 
-%   single-threaded
-%     0 - multi-threaded TFCE estimation
-%     1 - single-threaded TFCE estimation
-%
 %   conspec.contrasts
 %     Inf - interactive selection of contrast
 %     x   - index of contrast(s)
 %
 %   mask
-%     mask for restricting TFCE estimation (SVC)
+%     mask for restricting NCA estimation (SVC)
 %
 % ______________________________________________________________________
 %
@@ -61,15 +60,6 @@ end
 % Use tail approximation from the Gamma distribution for corrected P-values 
 use_gamma_tail_approximation = true;
 tail_approximation_wo_unpermuted_data = false;
-
-% single-threaded?
-singlethreaded = job.singlethreaded;
-
-% method to deal with nuisance variables
-% 0 - Draper-Stoneman
-% 1 - Freedman-Lane
-% 2 - Smith
-nuisance_method = job.nuisance_method;
 
 % display permuted design matrix (otherwise show t distribution)
 show_permuted_designmatrix = true;
@@ -483,42 +473,22 @@ for con = 1:length(Ic0)
   fprintf('\n');
   fprintf('# of conditions: %d\n',n_cond);
            
-  % Guttman partioning of design matrix into effects of interest X and nuisance variables Z
   X = xX.X(:,ind_X);
-  ind_Z = [xX.iH xX.iC xX.iB xX.iG];
-  ind_Z(ind_X) = [];
-  Z = xX.X(:,ind_Z);
-    
-  Hz = Z*pinv(Z);
-  Rz = eye(size(X,1)) - Hz;
-
-  % if Hz is zero or Ic is empty then no confounds were found and we can skip the time-consuming
-  % Freedman-Lane permutation
-  if (all(~any(Hz)) || isempty(xX.iC)) || all(~any(diff(Hz)))
-    exist_nuisance = false;
-  else
-    exist_nuisance = true;
-  end
-  
-  if ~exist_nuisance && nuisance_method > 0
-    fprintf('No nuisance variables were found: Use Draper-Stoneman permutation.\n\n');
-    nuisance_method = 0;
-  end
-
-  switch nuisance_method 
-  case 0
-    str_permutation_method = 'Draper-Stoneman';
-  case 1
-    str_permutation_method = 'Freedman-Lane';
-  case 2
-    str_permutation_method = 'Smith';
-  end
 
   % name of contrast
   c_name0 = deblank(xCon.name);
 
-  c_name = sprintf('%s (%s) ',c_name0,str_permutation_method);
+  c_name = sprintf('%s ',c_name0);
 
+  % obtain new mask that is only defined in regions with significant effects
+  P = zeros(VY(1).dim);
+  P(ind_mask) = calc_GLM(Y,xX,xCon,ind_mask);
+  ind_maskP = P(ind_mask) < 0.001;
+  
+  Y(~ind_maskP,:) = [];
+  
+  ind_mask = find(mask > 0 & P < 0.001);
+  
   % compute unpermuted d-map
   d0 = calc_NCA(Y,xX,xCon,ind_mask,VY(1).dim);
       
@@ -559,7 +529,7 @@ for con = 1:length(Ic0)
   %---------------------------------------------------------------
   name = sprintf('NCAd_%04d',Ic);
   Vt.fname = fullfile(cwd,[name file_ext]);
-  Vt.descrip = sprintf('NCAd %04d %s',Ic,str_permutation_method);
+  Vt.descrip = sprintf('NCAd %04d',Ic);
   Vt = spm_data_hdr_write(Vt);
   spm_data_write(Vt,d0);
 
@@ -572,7 +542,6 @@ for con = 1:length(Ic0)
   d_min       = [];
   d_max       = [];
   d_max_th    = [];
-
 
   % general initialization
   try % use try commands to allow batch mode without graphical output
@@ -724,23 +693,7 @@ for con = 1:length(Ic0)
     Xperm_debug = xX.X;
     Wperm = xX.W;
 
-    switch nuisance_method 
-    case 0 % Draper-Stoneman is permuting X
-      Xperm(:,ind_X) = Pset*Xperm(:,ind_X);
-%      if n_cond ~= 1
-%        Wtmp = Pset*xX.W;
-%        Wperm(ind_data_defined,ind_data_defined) = Wtmp(ind_data_defined,ind_data_defined);
-%      end
-    case 1 % Freedman-Lane is permuting Y
-      Xperm = xX.X;
-    case 2 % Smith method is additionally orthogonalizing X with respect to Z
-      Xperm(:,ind_X) = Pset*Rz*Xperm(:,ind_X);
-%      if n_cond ~= 1
-%        Wtmp = Pset*Rz*xX.W;
-%        Wperm(ind_data_defined,ind_data_defined) = Wtmp(ind_data_defined,ind_data_defined);
-%      end
-    end
-            
+    Xperm(:,ind_X) = Pset*Xperm(:,ind_X);        
     Xperm_debug(:,ind_X) = Pset*Xperm_debug(:,ind_X);
     
     % correct interaction designs
@@ -876,12 +829,7 @@ for con = 1:length(Ic0)
       xXperm.X = Xperm;        
       xXperm.W = Wperm;
 
-      % Freedman-Lane permutation of data
-      if nuisance_method == 1
-        d = calc_NCA(Y*(Pset'*Rz),xXperm,xCon,ind_mask,VY(1).dim);
-      else
-        d = calc_NCA(Y,xXperm,xCon,ind_mask,VY(1).dim);
-      end
+      d = calc_NCA(Y,xXperm,xCon,ind_mask,VY(1).dim);
       
       % remove all NaN and Inf's
       d(isinf(d) | isnan(d)) = 0;
@@ -991,7 +939,7 @@ for con = 1:length(Ic0)
   %---------------------------------------------------------------
   name = sprintf('NCAd_log_p_%04d',Ic);
   Vt.fname = fullfile(cwd,[name file_ext]);
-  Vt.descrip = sprintf('NCAd %04d %s',Ic, str_permutation_method);
+  Vt.descrip = sprintf('NCAd %04d',Ic);
 
   nPtlog10 = zeros(size(d0));
 
@@ -1020,12 +968,20 @@ for con = 1:length(Ic0)
   %---------------------------------------------------------------
   name = sprintf('NCAd_log_pFWE_%04d',Ic);
   Vt.fname = fullfile(cwd,[name file_ext]);
-  Vt.descrip = sprintf('NCAd %04d FWE %s',Ic, str_permutation_method);
+  Vt.descrip = sprintf('NCAd %04d FWE',Ic);
 
   corrP = zeros(size(d));
 
   if use_gamma_tail_approximation
-    
+
+    fprintf('Using tail approximation from the Gamma distribution for corrected P-values.\n');
+
+    if tail_approximation_wo_unpermuted_data
+      ind_tail = 2:n_perm;
+    else
+      ind_tail = 1:n_perm;
+    end
+
     if found_P
       [mu,s2,gamm1] = palm_moments(d_max(ind_tail)');
       corrP(mask_P) = palm_gamma(d0(mask_P),mu,s2,gamm1,false,1/n_perm);
@@ -1085,14 +1041,14 @@ for con = 1:length(Ic0)
   %---------------------------------------------------------------
   name = sprintf('NCAd_log_pFDR_%04d',Ic);
   Vt.fname = fullfile(cwd,[name file_ext]);
-  Vt.descrip = sprintf('NCAd %04d FDR %s',Ic, str_permutation_method);
+  Vt.descrip = sprintf('NCAd %04d FDR',Ic);
 
   corrPfdr = NaN(size(d));
   corrPfdrlog10 = zeros(size(d0));
 
   if found_P
+    [snP_pos,I_pos] = sort(nPt(mask_P));
     if ~isempty(snP_pos)
-      [snP_pos,I_pos] = sort(nPt(mask_P));
       corrPfdr_pos = snpm_P_FDR([],[],'P',[],snP_pos);
       corrPfdr_pos(I_pos) = corrPfdr_pos;
       corrPfdr(mask_P) = corrPfdr_pos;
@@ -1206,16 +1162,43 @@ end
 
 %---------------------------------------------------------------
 function d = calc_NCA(Y,xX,xCon,ind_mask,dim)
+% compute effect size of the necessary condition
+%
+% Y        - masked data as vector
+% xX       - design structure
+% xCon     - contrast structure
+% ind_mask - mask image
+% dim      - image dimension
+%
+% Output:
+% d        - effect size d
+
+c = xCon.c;
+ind_c = c ~= 0;
+if sum(ind_c) > 1
+  error('Only regression designs supported.');
+end
+
+X = xX.W*xX.X(:,ind_c);
+
+d = zeros(dim);
+d(ind_mask) = NCA(X,Y');
+
+if c(ind_c) < 0
+  d = -d;
+end
+
+%---------------------------------------------------------------
+function P = calc_GLM(Y,xX,xCon,ind_mask)
 % compute T- or F-statistic using GLM
 %
 % Y        - masked data as vector
 % xX       - design structure
 % xCon     - contrast structure
 % ind_mask - index of mask image
-% dim      - image dimension
 %
 % Output:
-% d        - effect size d
+% T        - P-values
 
 c = xCon.c;
 
@@ -1237,13 +1220,16 @@ ResMS = ResSS/trRV;
 %-Modify ResMS (a form of shrinkage) to avoid problems of very low variance
 ResMS  = ResMS + 1e-3 * max(ResMS(isfinite(ResMS)));
 
-
-T = zeros(dim);
-
+if strcmp(xCon.STAT,'T')
   Bcov = pKX*pKX';
   con = Beta*c;
 
-  T(ind_mask) = con./(eps+sqrt(ResMS*(c'*Bcov*c)));
+  T = con./(eps+sqrt(ResMS*(c'*Bcov*c)));
+  P = 1-spm_Tcdf(T,trRV);
+else
+  error('F-test not supported');
+end
+
 
 %---------------------------------------------------------------
 function xX = correct_xX(xX)

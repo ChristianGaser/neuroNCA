@@ -123,22 +123,6 @@ n_perm.val     = {5000};
 n_perm.num     = [1 Inf];
 
 % ---------------------------------------------------------------------
-% method to deal with nuisance variables
-% ---------------------------------------------------------------------
-nuisance_method         = cfg_menu;
-nuisance_method.tag     = 'nuisance_method';
-nuisance_method.name    = 'Permutation method to deal with nuisance variables';
-nuisance_method.labels = {'Draper-Stoneman','Smith','Freedman-Lane (experimental)'};
-nuisance_method.values  = {0 2 1};
-nuisance_method.val     = {2};
-nuisance_method.help    = {'A number of methods are available to obtain parameter estimates and construct a reference distribution in the presence of nuisance variables. Smith permutation method is used if any nuisance variables exist and is selected by default. If no nuisance variables were found in the model then Draper-Stoneman method is automatically used. '
-''
-'Freedman-Lane is another permutation method to deal with nuisance parameters. However, behaviour of that method was found to be strange under some circumstances and you have to apply this method very carefully. '
-''
-'It is only necessary to change the permutation method if a large discrepancy between parametric and non-parametric statistic was found, which is indicated at the Matlab command line. '
-}';
-
-% ---------------------------------------------------------------------
 % conspec Contrast query
 % ---------------------------------------------------------------------
 conspec         = cfg_branch;
@@ -148,28 +132,11 @@ conspec.val     = {titlestr contrasts n_perm};
 conspec.help    = {''};
 
 % ---------------------------------------------------------------------
-% multithreading
-% ---------------------------------------------------------------------
-singlethreaded    = cfg_menu;
-singlethreaded.tag = 'singlethreaded';
-singlethreaded.name = 'Use multi-threading to speed up calculations';
-singlethreaded.labels = {'yes','no'};
-singlethreaded.values = {0 1};
-if ispc
-  singlethreaded.val  = {1};
-else
-  singlethreaded.val  = {0};
-end
-singlethreaded.help = {[...
-'Multithreading can be used to distribute calculations to multiple processors. ',...
-'This will minimize calculation time by a large amount, but makes trouble on Windows machines, where it is deselected by default. ']};
-
-% ---------------------------------------------------------------------
 % results Results Report
 % ---------------------------------------------------------------------
 NCA_estimate          = cfg_exbranch;
 NCA_estimate.tag      = 'NCA_estimate';
-NCA_estimate.name     = 'Estimate TFCE';
-NCA_estimate.val      = {data nproc mask conspec nuisance_method singlethreaded};
+NCA_estimate.name     = 'Estimate NCA';
+NCA_estimate.val      = {data nproc mask conspec};
 NCA_estimate.help     = {''};
 NCA_estimate.prog     = @NCA_estimate_stat;
