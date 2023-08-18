@@ -71,37 +71,37 @@ for k = 1:2
   % the empty space of the left upper triangle
   if k == 1 && any(~flipx)
     indx = ~flipx;
-    [Xsort, Xind] = sort(X);
     Y2 = Y(:,indx);
+    [Ysort, Yind] = sort(Y2);
     
   % and second, use all entries with a negative slope and estimate
   % the empty space of the right upper triangle
   elseif k == 2 && any(flipx)
     indx = flipx;
     X = flipud(X);
-    [Xsort, Xind] = sort(X,'descend');
     Y2 = flipud(Y(:,indx));
+    [Ysort, Yind] = sort(Y2,'descend');
   end
     
   % continue if nothing was found
   if isempty(indx), continue; end
   
   % initialize maximum of Yi
-  Yimx = -1e10*ones(1,size(Y2,2));
+  Yimx = -1e10*ones(1,size(X,2));
   
   % go through each X-value
   for j = 1:numel(X)
     
     % find entry in sorted X-values
-    i = find(X == Xsort(j));
+    [i, tmp] = find(Y2 == Ysort(j,:));
     
     % if we have multiple Y-values for the same X-value we need the largest
     % Y-value
     if numel(i) > 1
-      Yi = max(Y2(i,:));
+      Yi = max(Y2(i));
       i = i(1);
     else
-      Yi = Y2(i,:);
+      Yi = X(i);
     end
     
     % if Yi exceeds previous maximum we add the new values to the fdh-peers
@@ -112,8 +112,8 @@ for k = 1:2
       Yi(~ind) = NaN;
       
       % build list of FDH peers
-      Xfdh(Xind(i)) = X(i);
-      Yfdh(indx,Xind(i)) = Yi;
+      Xfdh(Yind(i)) = X(i);
+      Yfdh(indx,Yind(i)) = Yi;
     end
   end
   

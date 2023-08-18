@@ -41,7 +41,7 @@ if size(X,1) == 1
 end
 
 % transpose if necessary
-if size(X,1) ~= size(Y,1)
+if size(Y,1) == 1
   Y = Y';
 end
 
@@ -49,86 +49,53 @@ end
 if size(X,1) ~= size(Y,1)
   error('Size mismatch between X and Y.');
 end
-  
-% initialize output
-d = zeros(size(Y,2),1);
-p = zeros(size(Y,2),2);
 
 % check whether slope is negative
 beta = linear_fit(X,Y);
 
 % if slope is negative we have to mirror Y and estimate the left lower corner
-flipx = beta(:,2) < 0;
+flipx = beta < 0;
 
 Xfdh = nan(size(X));
-Yfdh = nan(size(Y,2),size(Y,1),'single');
+Yfdh = nan(size(Y));
 
-% go through both, flipx and ~flipx
-for k = 1:2
-
-  indx = [];
-  % first, go through all entries with a positive slope and estimate
-  % the empty space of the left upper triangle
-  if k == 1 && any(~flipx)
-    indx = ~flipx;
-    [Xsort, Xind] = sort(X);
-    Y2 = Y(:,indx);
-    
-  % and second, use all entries with a negative slope and estimate
-  % the empty space of the right upper triangle
-  elseif k == 2 && any(flipx)
-    indx = flipx;
-    X = flipud(X);
-    [Xsort, Xind] = sort(X,'descend');
-    Y2 = flipud(Y(:,indx));
-  end
-    
-  % continue if nothing was found
-  if isempty(indx), continue; end
-  
-  % initialize maximum of Yi
-  Yimx = -1e10*ones(1,size(Y2,2));
-  
-  % go through each X-value
-  for j = 1:numel(X)
-    
-    % find entry in sorted X-values
-    i = find(X == Xsort(j));
-    
-    % if we have multiple Y-values for the same X-value we need the largest
-    % Y-value
-    if numel(i) > 1
-      Yi = max(Y2(i,:));
-      i = i(1);
-    else
-      Yi = Y2(i,:);
-    end
-    
-    % if Yi exceeds previous maximum we add the new values to the fdh-peers
-    ind = Yi > Yimx;
-    if any(ind)
-      % only set new maximum for entries where values exceeded
-      Yimx(ind) = Yi(ind);
-      Yi(~ind) = NaN;
-      
-      % build list of FDH peers
-      Xfdh(Xind(i)) = X(i);
-      Yfdh(indx,Xind(i)) = Yi;
-    end
-  end
-  
-  % get offset and slope of the FDH peers
-  [d0, p0] = NCA_effect_size(Xfdh,Yfdh(indx,:),X,Y2);
-  
-  d(indx) = d0;
-  p(indx,:) = p0;
-
+% for positive slope estimate the empty space of the left upper triangle
+if flipx
+  X = flipud(X);
+  [Xsort, Xind] = sort(X,'descend');
+  Y2 = flipud(Y);
+else % otherwise we estimate the empty space of the right upper triangle
+  [Xsort, Xind] = sort(X);
+  Y2 = Y;
 end
 
-% remove NAN entries for output
-ind = isfinite(Xfdh);
-Xfdh = Xfdh(ind);
-Yfdh = Yfdh(:,ind);
+% initialize maximum of Yi
+Yimx = -1e10;
+
+% go through each X-value
+for j = 1:numel(X)
+
+  % find entry in sorted X-values
+  i = find(X == Xsort(j));
+
+  % if we have multiple Y-values for the same X-value we need the largest
+  % Y-value
+  Yi = max(Y2(i));
+  i = i(1);
+
+  % if Yi exceeds previous maximum we add the new values to the fdh-peers
+  if Yi > Yimx
+    % only set new maximum for entries where values exceeded
+    Yimx = Yi;
+
+    % build list of FDH peers
+    Xfdh(Xind(i)) = X(i);
+    Yfdh(Xind(i)) = Yi;
+  end
+end
+  
+% get offset and slope of the FDH peers
+[d, p] = NCA_effect_size(Xfdh,Yfdh,X,Y2);
 
 % ______________________________________________________________________
 function [d, beta] = NCA_effect_size(Xfdh,Yfdh,X,Y)

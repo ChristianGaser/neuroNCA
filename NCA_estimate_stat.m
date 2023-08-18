@@ -1,7 +1,7 @@
 function NCA_estimate_stat(job)
 % Main NCA function for estimating NCA statistics
 %
-% Existing SPM designs (saved as SPM.mat) are used to recognise the model. 
+% Existing SPM designs (saved as SPM.mat) are used to recognise the model 
 % and restrict the NCA to regression designs. Additional nuisance parameters are
 % ignored, as the necessity of a factor does not depend on other factors, 
 % and the model specification can be restricted to the potentially necessary 
